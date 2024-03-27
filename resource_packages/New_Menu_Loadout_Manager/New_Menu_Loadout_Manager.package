@@ -1,0 +1,11 @@
+mod = [
+	"New_Menu_Loadout_Manager"
+]
+
+package = [
+	"resource_packages/New_Menu_Loadout_Manager/New_Menu_Loadout_Manager"
+]
+
+lua = [
+	"scripts/mods/New_Menu_Loadout_Manager/*"
+]
