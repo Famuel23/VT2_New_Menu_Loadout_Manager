@@ -1,4 +1,5 @@
-# VT2_New_Menu_Loadout_Manager
+# Vermintide 2: New Menu Loadout Manager
+
 Author: 
 famuel_nz
 
