@@ -14,18 +14,22 @@ CloudFile.init = function(self, mod, filename)
 		self:update()
 	end)
 end
+
 CloudFile.is_idle = function(self)
 	return not self.on_completed and not self.save_data
 end
+
 CloudFile.load = function(self, callback)
 	fassert(self:is_idle(), "Attempt to begin CloudFile operation while already busy")
 	self.on_completed = callback
 end
+
 CloudFile.save = function(self, data, callback)
 	fassert(self:is_idle(), "Attempt to begin CloudFile operation while already busy")
 	self.on_completed = callback or (function() end)
 	self.save_data = data
 end
+
 CloudFile.cancel = function(self)
 	-- If an operation is in progress we don't actually cancel it, we just clear
 	-- its completion callback, which allows a new operation to be queued.
@@ -33,6 +37,7 @@ CloudFile.cancel = function(self)
 	self.save_data = nil
 	self.is_cancelled = not not self.token
 end
+
 CloudFile.update = function(self)
 	if self.token then
 		local progress = Cloud.progress(self.token)
