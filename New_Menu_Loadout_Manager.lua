@@ -3,11 +3,11 @@ local mod = get_mod("New_Menu_Loadout_Manager")
 --[[
 	Author: famuel_nz
 
-    Adds the functionality for saving and quickly changing between gear/talent loadouts on the new menu style. 
+    Adds the functionality for saving and quickly changing between loadouts (items/talents/cosmetics) with the new menu style. 
 --]]
 
 --#########################--
------------ DATA ------------
+--------- VARIABLES ---------
 --#########################--
 
 -- Workaround for deletion (in patch 1.5) of a function required by SimpleUI.
@@ -20,49 +20,23 @@ local SPProfiles = SPProfiles
 local is_hero_character_info_hooked = false
 
 -- Mod variables
-mod.simple_ui = nil 
-mod.button_theme = nil
 mod.cloud_file = nil
 mod.saved_loadouts = nil
 mod.hero_view_data = nil
-mod.loadouts_window = nil
 mod.is_loading = false
 mod.equipment_queue = {}
 mod.careerDecodes = {}
+
+mod.scenegraph= nil
+mod.widgets = nil
 
 --#########################--
 --------- FUNCTIONS ---------
 --#########################--
 
--- Function to perform initial setup.
+-- Function which performs initial setup of SimpleUI elements, career decodes and a cloud file for saving loadout data.
 mod.on_all_mods_loaded = function()
     
-	mod.simple_ui = get_mod("SimpleUI")
-
-    if mod.simple_ui then
-
-        -- Create font
-        mod.simple_ui.fonts:create("loadoutmgr_font", "hell_shark", 20)
-
-		-- Create Style for buttons
-		local button_theme = table.clone(mod.simple_ui.themes.default.default)		
-        button_theme.font = "loadoutmgr_font"
-
-        button_theme.color = Colors.get_color_table_with_alpha("black", 255)
-        button_theme.color_hover = Colors.get_color_table_with_alpha("white", 0)
-        button_theme.color_clicked = button_theme.color
-
-        button_theme.color_text = Colors.get_color_table_with_alpha("font_button_normal", 255)
-        button_theme.color_text_hover = Colors.get_color_table_with_alpha("white", 255)
-        button_theme.color_text_clicked = Colors.get_color_table_with_alpha("font_default", 255)
-
-        button_theme.shadow = {layers = 4, border = 0, color = Colors.get_color_table_with_alpha("white", 35)}
-        mod.button_theme = button_theme
-
-    else
-        mod:echo("New Menu Loadout Manager Error: Missing Dependency: 'Simple UI'")
-    end
-
     -- Initialise decodes for hero career names
     mod.careerDecodes = {es_mercenary = "Mercenary", es_huntsman = "Huntsman", es_knight = "Foot Knight", es_questingknight = "Grail Knight",
                          dr_ranger = "Ranger Veteran", dr_ironbreaker = "Ironbreaker", dr_slayer = "Slayer", dr_engineer = "Outcast Engineer",
@@ -71,118 +45,27 @@ mod.on_all_mods_loaded = function()
                          bw_adept = "Battle Wizard", bw_scholar = "Pyromancer", bw_unchained = "Unchained", bw_necromancer = "Necromancer"}
 
     -- Create a local object to access the file in which saved loadouts are kept
+    -- DATA is saved in C:\Program Files (x86)\Steam\userdata\%usernumber%\552500\remote
     local CloudFile = mod:dofile("scripts/mods/New_Menu_Loadout_Manager/cloud_file") 
     mod.cloud_file = CloudFile:new(mod, mod:get_name() .. ".data")
     mod.cloud_file:load(function(result)
 		mod.saved_loadouts = result.data or {}
 	end)
+
+    -- Creates a series of widgets and a UI scenegraph to make up the 10 loadout buttons
+    mod.make_loadout_widgets = mod:dofile("scripts/mods/New_Menu_Loadout_Manager/make_loadout_widgets")
+    local widget_populator = mod.make_loadout_widgets()
+    mod.scenegraph = widget_populator.scenegraph
+    mod.widgets = widget_populator.widgets
 end
 
--- Function to return the hero name, career name, decoded career name and career index of the selected loadout.
+-- Function to return the hero name, career name, and career index of the selected loadout.
 mod.get_hero_details = function(self)
-    local profile = SPProfiles[FindProfileIndex(self.hero_view_data.hero_name)]
+    local profile_index = FindProfileIndex(self.hero_view_data.hero_name)
+    local profile = SPProfiles[profile_index]
 	local career_index = self.hero_view_data.career_index
 	local career_name = profile.careers[career_index].name
 	return self.hero_view_data.hero_name, career_name, career_decode, career_index
-end
-
--- Function to return the size and position of the Loadout buttons window.
--- TODO: Figure out how to align and scale this correctly, to bottom left by the friends icon. 
-mod.get_gui_dimensions = function(self)	
-    local scale = (UISettings.ui_scale or 100) / 100
-    local gui_size = {math.floor(511 * scale), math.floor(694 * scale)}
-	local gui_x_position = math.floor((UIResolutionWidthFragments() - gui_size[1]) / 4 + 30)
-    local gui_y_position = math.floor((UIResolutionHeightFragments() - gui_size[2]) / 2 - 3) -- + 62 * scale)
-
-    -- Return GUI size, Position, Height of Buttons
-    return gui_size, {gui_x_position, gui_y_position}, math.floor(47 * scale)
-end
-
--- Function to close any currently open windows.
-mod.destroy_windows = function(self)
-    if self.loadouts_window then
-    	self.loadouts_window:destroy()
-        self.loadouts_window = nil
-    end
-end
-
--- Function which checks for right-click mouse events within the loadout buttons window, and sends them to the appropriate widget.
-local function dispatch_right_click(window)
-	if stingray.Mouse.pressed(stingray.Mouse.button_id("right")) then
-		local simple_ui = mod.simple_ui
-		local position = simple_ui.mouse:cursor()
-		for _, widget in pairs(window.widgets) do
-			if simple_ui:point_in_bounds(position, widget:extended_bounds()) and widget.on_right_click then
-				widget:on_right_click()
-				break
-			end
-		end
-	end
-end
-
--- Function to create the window which shows a numbered button for each loadout.
-mod.create_loadouts_window = function(self)
-
-    if not self.loadouts_window and self.simple_ui then
-        
-		local gui_size, gui_position, loadout_buttons_height = self:get_gui_dimensions()
-        local window_size = {gui_size[1], loadout_buttons_height}
-        local window_position = {gui_position[1], gui_position[2]}
-        local window_name = "loadouts"
-        self.loadouts_window = self.simple_ui:create_window(window_name, window_position, window_size)
-
-		local _, career_name = self:get_hero_details()
-
-        -- On Left Click, equip the loadout
-        local on_button_left_click = function(event) 
-            local button_number = tonumber(event.params)
-            mod:equip_loadout(button_number, career_name)      
-        end
-
-        -- On Right Click, save the current loadout to this button
-        local on_save_click = function(event) 
-            local button_number = tonumber(event.params)           
-            mod:save_loadout(button_number, career_name)
-        end
-
-		-- Set up buttons
-        local ui_scale = (UISettings.ui_scale or 100) / 100
-        local button_size = {math.floor(33 * ui_scale), math.floor(33 * ui_scale)}
-        local spacing = math.floor(10 * ui_scale)
-        local margin = (window_size[1] - (NUM_LOADOUT_BUTTONS * button_size[1]) - ((NUM_LOADOUT_BUTTONS - 1) * spacing)) / 2
-        local y_offset = (loadout_buttons_height - button_size[2]) / 2
-
-		-- Add a button for each loadout. Clicking will open the details window
-        for button_column = 1, NUM_LOADOUT_BUTTONS do
-            local x_offset = margin + (button_column - 1) * (button_size[1] + spacing) 
-            local name = (window_name .. "_" .. button_column)
-            local newButton = self.loadouts_window:create_button(name, {x_offset, y_offset}, button_size, nil, "", button_column)
-
-            newButton.theme = self.button_theme
-            newButton.on_click = on_button_left_click
-            newButton.on_right_click = on_save_click
-			newButton.text = tostring(button_column)
-			newButton.tooltip = sprintf("Loadout %d", button_column)
-        end
-       
-        self.loadouts_window.on_hover_enter = function(window)
-			window:focus()
-		end
-        
-        self.loadouts_window.after_update = dispatch_right_click
-        self.loadouts_window:init()
-
-        local theme = self.loadouts_window.theme
-		theme.color = {0, 0, 0, 0}
-		theme.color_hover = theme.color
-    end
-
-end
-
--- Function to Reload the loadouts window, after closing any already open windows.
-mod.reload_windows = function(self)
-    self:destroy_windows()
-    self:create_loadouts_window()
 end
 
 -- Function to return a loadout for a given loadout number and career name.
@@ -264,15 +147,15 @@ local function is_next_equip_valid(next_equip)
 end
 
 -- Function to equip the loadout (gear/talents/cosmetics) associated to the given loadout number.
-mod.equip_loadout = function(self, loadout_number, career_name)
+mod.equip_loadout = function(self, loadout_number)
 
     -- Check for valid loadout
+    local _, career_name = mod:get_hero_details()
     local loadout = self:get_loadout(loadout_number, career_name)
     if not loadout then
         self:echo("Error: Loadout #" ..tostring(loadout_number).. " not found for " .. mod.careerDecodes[career_name])
         return
     end
-
     
     -- Set Talents
     local unit = Managers.player:local_player().player_unit
@@ -328,21 +211,76 @@ end
 --#########################--
 
 -- Hook on HeroViewStateOverview._start_transition_animation
--- This hook sets the hero_view_data from Fatshark's Hero View screens, and loads the mod UI components
+-- This hook sets the hero_view_data from Fatshark's Hero View screens.
 local hook_HeroWindowHeroPowerConsole_on_enter = function(self)
 	mod.hero_view_data = self
-	if mod.saved_loadouts then 
-		mod:reload_windows() 
-	end
 end
 
 -- Hook on HeroViewStateOverview.on_exit
--- This hook destroys our mod windows, and resets the hero_view_data as the Fatshark screens are now closed
+-- This hook resets the hero_view_data and cancels any cloud file operations, as the Fatshark Hero View screens are now closed.
 local hook_HeroWindowHeroPowerConsole_on_exit = function()
-	mod:destroy_windows()
-	mod.cloud_file:cancel()
 	mod.hero_view_data = nil
+	mod.cloud_file:cancel()
 end
+
+-- Hook on HeroWindowHeroPowerConsole.draw
+-- This hook draws the collection of widgets from the make_loadout_widgets file, which make up the buttons for this mod.
+local hook_HeroWindowHeroPowerConsole_draw = function(self, dt)
+
+    if mod.widgets then
+        UIRenderer.begin_pass(self.ui_top_renderer, mod.scenegraph, self.parent:input_service(), dt, nil, self.render_settings)
+
+        for _, widget_group in pairs(mod.widgets) do
+            for _, widget in pairs(widget_group) do
+                UIRenderer.draw_widget(self.ui_top_renderer, widget)
+            end
+        end
+
+        UIRenderer.end_pass(self.ui_top_renderer)
+    end
+
+end
+
+-- TODO: Add right click, see if you can make this look cleaner for the 10 loadout buttons. Ensure performance is good
+-- Hook on HeroViewStateOverview._handle_input
+-- This hook will handle input events for equipping or saving a loadout to a given button.
+mod:hook_safe(HeroViewStateOverview, "_handle_input", function (self, dt, t)
+
+    local loadout_buttons = mod.widgets.loadouts
+
+    if self:_is_button_pressed(loadout_buttons["loadout_1"]) then
+        mod:equip_loadout(1)
+    end
+
+    if self:_is_button_pressed(loadout_buttons["loadout_2"]) then
+        mod:echo("Loadout 2!")
+    end
+
+    if self:_is_button_pressed(loadout_buttons["loadout_3"]) then
+        mod:echo("Loadout 3!")
+    end
+
+    if self:_is_button_pressed(loadout_buttons["loadout_4"]) then
+        mod:echo("Loadout 4!")
+    end
+
+    if self:_is_button_pressed(loadout_buttons["loadout_5"]) then
+        mod:echo("Loadout 5!")
+    end
+
+end)
+
+-- TODO: Investigate hooking directly here and into the scenegraph as per test one
+-- mod:hook_safe(HeroViewStateOverview, "create_ui_elements", function(orig_func, self, params)
+--     if mod.widgets then
+--         for _, widget_group in pairs(mod.widgets) do
+--             for _, widget in pairs(widget_group) do  
+--                 self._widgets[#self._widgets + 1] = widget
+--                 self._widgets_by_name[name] = widget.scenegraph_id
+--             end
+--         end
+--     end
+-- end)
 
 -- Hook on HeroViewStateOverview._setup_menu_layout, which fires when opening the details for a given Hero
 -- This hook then adds our safe hooks to the HeroWindowCharacterInfo on_enter and on_exit to draw/destroy our windows
@@ -353,6 +291,7 @@ mod:hook(HeroViewStateOverview, "_setup_menu_layout", function(hooked_function, 
 	if use_gamepad_layout and not is_hero_character_info_hooked then
 		mod:hook_safe(HeroWindowHeroPowerConsole, "on_enter", hook_HeroWindowHeroPowerConsole_on_enter)
 		mod:hook_safe(HeroWindowHeroPowerConsole, "on_exit", hook_HeroWindowHeroPowerConsole_on_exit)
+        mod:hook_safe(HeroWindowHeroPowerConsole, "draw", hook_HeroWindowHeroPowerConsole_draw)
         is_hero_character_info_hooked = true
 	end
 
