@@ -54,9 +54,6 @@ mod.on_all_mods_loaded = function()
 
     -- Creates a series of widgets and a UI scenegraph to make up the 10 loadout buttons
     mod.make_loadout_widgets = mod:dofile("scripts/mods/New_Menu_Loadout_Manager/make_loadout_widgets")
-    local widget_populator = mod.make_loadout_widgets()
-    mod.scenegraph = widget_populator.scenegraph
-    mod.widgets = widget_populator.widgets
 end
 
 -- Function to return the hero name, career name, and career index of the selected loadout.
@@ -74,7 +71,10 @@ mod.get_loadout = function(self, loadout_number, career_name)
 end
 
 -- Function to save the loadout (gear/talents/cosmetics) for a given loadout number and career name.
-mod.save_loadout = function(self, loadout_number, career_name)
+mod.save_loadout = function(self, loadout_number)
+
+    -- Retrieve active career details
+    local _, career_name = mod:get_hero_details()
 
     -- Retrieve the current gear
     local gear_loadout = {}
@@ -114,43 +114,13 @@ mod.save_loadout = function(self, loadout_number, career_name)
 
 end
 
--- Function to determine whether the selected equipment is valid on a given career.
--- This check fixes exploits (quick switching careers / making loadouts in the modded realm and then swapping to offical)
-local function is_equipment_valid(item, career_name, slot_name)
-
-    local item_data = item.data
-    local is_valid = table.contains(item_data.can_wield, career_name)
-
-    if not is_valid then
-         mod:echo("ERROR: Cannot equip item " .. item_data.display_name .. " on Career: " .. career_name) 
-    else     
-        local actual_slot_type = item_data.slot_type
-        local expected_slot_type = InventorySettings.slots_by_name[slot_name].type
-        is_valid = (actual_slot_type == expected_slot_type)
-
-        -- Special case: Grail Knight, Slayer and Warrior Priest can equip melee weapons in the ranged slot.
-        if not is_valid and (career_name == "es_questingKnight" or career_name == "dr_slayer" or career_name == "wh_priest") and expected_slot_type == ItemType.RANGED then
-            is_valid = (actual_slot_type == ItemType.MELEE)
-        end
-
-        if not is_valid then mod:echo("ERROR: Cannot equip item " .. item_data.display_name .. " in this slot type: " .. expected_slot_type) end
-    end
-
-    return is_valid 
-end
-
--- Function to check whether the next item in the equipment queue is valid in the specified slot, for the current career.
-local function is_next_equip_valid(next_equip)	
-    if not mod.hero_view_data then return false end
-	local _, career_name = mod:get_hero_details()
-	return is_equipment_valid(next_equip.item, career_name, next_equip.slot.name)
-end
-
 -- Function to equip the loadout (gear/talents/cosmetics) associated to the given loadout number.
 mod.equip_loadout = function(self, loadout_number)
 
-    -- Check for valid loadout
+    -- Retrieve active career details
     local _, career_name = mod:get_hero_details()
+        
+    -- Check for valid loadout
     local loadout = self:get_loadout(loadout_number, career_name)
     if not loadout then
         self:echo("Error: Loadout #" ..tostring(loadout_number).. " not found for " .. mod.careerDecodes[career_name])
@@ -186,9 +156,9 @@ mod.equip_loadout = function(self, loadout_number)
                     if unit then
                         -- Add item to queue
                         equipment_queue[#equipment_queue + 1] = {slot = slot, item = item}
-                    elseif is_equipment_valid(item, career_name, slot.name) then
-                        -- Set item 
-                        BackendUtils.set_loadout_item(item_backend_id, career_name, slot.name)
+                    -- elseif is_equipment_valid(item, career_name, slot.name) then
+                    --     -- Set item 
+                    --     BackendUtils.set_loadout_item(item_backend_id, career_name, slot.name)
                     end
                 end
             end
@@ -206,29 +176,107 @@ mod.equip_loadout = function(self, loadout_number)
     end
 end
 
+-- Function to determine whether the selected equipment is valid on a given career.
+-- This check fixes exploits (quick switching careers / making loadouts in the modded realm and then swapping to offical)
+local function is_equipment_valid(item, career_name, slot_name)
+
+    local item_data = item.data
+    local is_valid = table.contains(item_data.can_wield, career_name)
+
+    if not is_valid then
+         mod:echo("ERROR: Cannot equip item " .. item_data.display_name .. " on Career: " .. career_name) 
+    else     
+        local actual_slot_type = item_data.slot_type
+        local expected_slot_type = InventorySettings.slots_by_name[slot_name].type
+        is_valid = (actual_slot_type == expected_slot_type)
+
+        -- Special case: Grail Knight, Slayer and Warrior Priest can equip melee weapons in the ranged slot.
+        if not is_valid and (career_name == "es_questingKnight" or career_name == "dr_slayer" or career_name == "wh_priest") and expected_slot_type == ItemType.RANGED then
+            is_valid = (actual_slot_type == ItemType.MELEE)
+        end
+
+        if not is_valid then 
+            mod:echo("ERROR: Cannot equip item " .. item_data.display_name .. " in this slot type: " .. expected_slot_type) 
+        end
+    end
+
+    return is_valid 
+end
+
+-- Function to check whether the next item in the equipment queue is valid in the specified slot, for the current career.
+local function is_next_equip_valid(next_equip)	
+    if not mod.hero_view_data then 
+        return false 
+    end
+
+	local _, career_name = mod:get_hero_details()
+	return is_equipment_valid(next_equip.item, career_name, next_equip.slot.name)
+end
+
+-- Function which determines if a loadout button is currently being hovered.
+local is_loadout_hovered = function (self)
+    for i = 1, NUM_LOADOUT_BUTTONS do        
+		local widget = mod.widgets.loadouts["loadout_" ..i]
+
+		if widget then
+            local hotspot = widget.content["button_hotspot"]
+            
+            if hotspot.on_hover_enter and not hotspot.disabled then
+                return i
+            end
+        end
+    end
+end
+
+-- Function which determines if a loadout button is currently being pressed.
+-- Returns the loadout button index and left/right, depending on input type.
+local is_loadout_pressed = function (self)
+	for i = 1, NUM_LOADOUT_BUTTONS do        
+		local widget = mod.widgets.loadouts["loadout_" ..i]
+
+		if widget then
+            local hotspot = widget.content["button_hotspot"]
+            
+            if not hotspot.disabled then
+                if hotspot.on_pressed and not hotspot.is_selected then
+                    return i, "left"
+                elseif hotspot.on_right_click then
+                    return i, "right"
+                end
+            end
+		end
+
+	end
+end
+
 --#########################--
 ----------- HOOKS -----------
 --#########################--
 
 -- Hook on HeroViewStateOverview._start_transition_animation
--- This hook sets the hero_view_data from Fatshark's Hero View screens.
+-- This hook sets the hero_view_data from Fatshark's Hero View screens, and populates the loadout button widgets/scenegraph.
 local hook_HeroWindowHeroPowerConsole_on_enter = function(self)
 	mod.hero_view_data = self
+
+    local widget_populator = mod.make_loadout_widgets()
+    mod.scenegraph = widget_populator.scenegraph
+    mod.widgets = widget_populator.widgets
 end
 
 -- Hook on HeroViewStateOverview.on_exit
--- This hook resets the hero_view_data and cancels any cloud file operations, as the Fatshark Hero View screens are now closed.
+-- This hook resets the hero_view_data and loadout widgets as the Fatshark Hero View screens are now closed.
 local hook_HeroWindowHeroPowerConsole_on_exit = function()
 	mod.hero_view_data = nil
+    mod.scenegraph = nil
+    mod.widgets = nil
 	mod.cloud_file:cancel()
 end
 
 -- Hook on HeroWindowHeroPowerConsole.draw
 -- This hook draws the collection of widgets from the make_loadout_widgets file, which make up the buttons for this mod.
 local hook_HeroWindowHeroPowerConsole_draw = function(self, dt)
-
     if mod.widgets then
-        UIRenderer.begin_pass(self.ui_top_renderer, mod.scenegraph, self.parent:input_service(), dt, nil, self.render_settings)
+        UIRenderer.begin_pass(self.ui_top_renderer, mod.scenegraph, self.parent:window_input_service(), dt, nil, self.render_settings)
 
         for _, widget_group in pairs(mod.widgets) do
             for _, widget in pairs(widget_group) do
@@ -238,49 +286,27 @@ local hook_HeroWindowHeroPowerConsole_draw = function(self, dt)
 
         UIRenderer.end_pass(self.ui_top_renderer)
     end
-
 end
 
--- TODO: Add right click, see if you can make this look cleaner for the 10 loadout buttons. Ensure performance is good
 -- Hook on HeroViewStateOverview._handle_input
 -- This hook will handle input events for equipping or saving a loadout to a given button.
 mod:hook_safe(HeroViewStateOverview, "_handle_input", function (self, dt, t)
+    if mod.widgets then
+        -- Handle loadout button hovers
+        local loadout_button_hover = is_loadout_hovered()
+        if loadout_button_hover then 
+            self:play_sound("play_gui_equipment_button_hover")
+        end
 
-    local loadout_buttons = mod.widgets.loadouts
-
-    if self:_is_button_pressed(loadout_buttons["loadout_1"]) then
-        mod:equip_loadout(1)
+        -- Handle loadout button presses
+        local loadout_button_press, input = is_loadout_pressed()
+        if loadout_button_press and input == "left" then
+            mod:equip_loadout(loadout_button_press)
+        elseif loadout_button_press and input == "right" then 
+            mod:save_loadout(loadout_button_press)
+        end        
     end
-
-    if self:_is_button_pressed(loadout_buttons["loadout_2"]) then
-        mod:echo("Loadout 2!")
-    end
-
-    if self:_is_button_pressed(loadout_buttons["loadout_3"]) then
-        mod:echo("Loadout 3!")
-    end
-
-    if self:_is_button_pressed(loadout_buttons["loadout_4"]) then
-        mod:echo("Loadout 4!")
-    end
-
-    if self:_is_button_pressed(loadout_buttons["loadout_5"]) then
-        mod:echo("Loadout 5!")
-    end
-
 end)
-
--- TODO: Investigate hooking directly here and into the scenegraph as per test one
--- mod:hook_safe(HeroViewStateOverview, "create_ui_elements", function(orig_func, self, params)
---     if mod.widgets then
---         for _, widget_group in pairs(mod.widgets) do
---             for _, widget in pairs(widget_group) do  
---                 self._widgets[#self._widgets + 1] = widget
---                 self._widgets_by_name[name] = widget.scenegraph_id
---             end
---         end
---     end
--- end)
 
 -- Hook on HeroViewStateOverview._setup_menu_layout, which fires when opening the details for a given Hero
 -- This hook then adds our safe hooks to the HeroWindowCharacterInfo on_enter and on_exit to draw/destroy our windows
