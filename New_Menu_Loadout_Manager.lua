@@ -251,7 +251,7 @@ end
 
 -- Hook on HeroWindowHeroPowerConsole.on_enter
 -- This hook sets the hero_view_data from Fatshark's Hero View screens, and populates the loadout button widgets/scenegraph.
-local hook_HeroWindowHeroPowerConsole_on_enter = function(self)
+local hook_HeroWindowPanelConsole_on_enter = function(self)
 	mod.hero_view_data = self
 
     local widget_populator = mod.make_loadout_widgets()
@@ -261,7 +261,7 @@ end
 
 -- Hook on HeroWindowHeroPowerConsole.on_exit
 -- This hook resets the hero_view_data and loadout widgets as the Fatshark Hero View screens are now closed.
-local hook_HeroWindowHeroPowerConsole_on_exit = function()
+local hook_HeroWindowPanelConsole_on_exit = function()
 	mod.hero_view_data = nil
     mod.scenegraph = nil
     mod.widgets = nil
@@ -270,26 +270,36 @@ end
 
 -- Hook on HeroWindowHeroPowerConsole.draw
 -- This hook draws the collection of widgets populated from the make_loadout_widgets file, set in the above on_enter hook
-local hook_HeroWindowHeroPowerConsole_draw = function(self, dt)
-    if mod.widgets and mod.scenegraph then
-        UIRenderer.begin_pass(self.ui_top_renderer, mod.scenegraph, self.parent:window_input_service(), dt, nil, self.render_settings)
+local hook_HeroWindowPanelConsole_draw = function(self, dt)
 
-        for _, widget_group in pairs(mod.widgets) do
-            for _, widget in pairs(widget_group) do
-                UIRenderer.draw_widget(self.ui_top_renderer, widget)
+    -- TODO: We need to refresh talents when they are updated
+    -- TODO: We need to keep track of current talents selected on the screen when saving talents
+    
+    --window._talent_interface:set_talents(window._career_name, window._selected_talents)
+    --window:_initialize_talents()
+
+    for index, window in ipairs(self.parent._active_windows) do
+
+        if window.NAME == "HeroWindowTalentsConsole" or window.NAME == "HeroWindowLoadoutConsole" or window.NAME == "HeroWindowCosmeticsLoadoutConsole" then
+            if mod.widgets and mod.scenegraph then
+                UIRenderer.begin_pass(self.ui_renderer, mod.scenegraph, self.parent:window_input_service(), dt, nil, self.render_settings)
+        
+                for _, widget_group in pairs(mod.widgets) do
+                    for _, widget in pairs(widget_group) do
+                        UIRenderer.draw_widget(self.ui_renderer, widget)
+                    end
+                end
+        
+                UIRenderer.end_pass(self.ui_renderer)
             end
         end
-
-        UIRenderer.end_pass(self.ui_top_renderer)
     end
+    
 end
 
 -- Hook on HeroViewStateOverview._handle_input
 -- This hook will handle input events for equipping or saving a loadout to a given button.
 mod:hook_safe(HeroViewStateOverview, "_handle_input", function (self, dt, t)
-
-    -- TODO: Is performance on this okay? This function fires CONSTANTLY and then has to check each of the 10 loadout widgets for hover or press.
-    -- TODO: Investigate using a grid for the widgets.
 
     if mod.widgets then
         -- Handle loadout button hovers
@@ -306,6 +316,7 @@ mod:hook_safe(HeroViewStateOverview, "_handle_input", function (self, dt, t)
             mod:save_loadout(loadout_button_press)
         end        
     end
+
 end)
 
 -- Hook on HeroViewStateOverview._setup_menu_layout, which fires when opening the details for a Hero
@@ -315,11 +326,9 @@ mod:hook(HeroViewStateOverview, "_setup_menu_layout", function(hooked_function, 
 	local use_gamepad_layout = hooked_function(...)
 
 	if use_gamepad_layout and not is_hero_character_info_hooked then
-		mod:hook_safe(HeroWindowHeroPowerConsole, "on_enter", hook_HeroWindowHeroPowerConsole_on_enter)
-		mod:hook_safe(HeroWindowHeroPowerConsole, "on_exit", hook_HeroWindowHeroPowerConsole_on_exit)
-
-        -- TODO: Establish whether this is what is causing the multiple UIRenderer draw passes issue? Could be
-        mod:hook_safe(HeroWindowHeroPowerConsole, "draw", hook_HeroWindowHeroPowerConsole_draw)
+		mod:hook_safe(HeroWindowPanelConsole, "on_enter", hook_HeroWindowPanelConsole_on_enter)
+		mod:hook_safe(HeroWindowPanelConsole, "on_exit", hook_HeroWindowPanelConsole_on_exit)
+        mod:hook_safe(HeroWindowPanelConsole, "draw", hook_HeroWindowPanelConsole_draw)
         is_hero_character_info_hooked = true
 	end
 

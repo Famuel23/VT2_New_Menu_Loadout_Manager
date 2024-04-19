@@ -105,19 +105,19 @@ return function()
 				text_id = "text",
 				style_id = "text",
 			},
-			-- {
-			-- 	pass_type = "texture_frame",
-			-- 	style_id = "frame",
-			-- 	texture_id = "frame",
-			-- },
-			-- {
-			-- 	pass_type = "texture",
-			-- 	style_id = "hover",
-			-- 	content_id = "hover",
-			-- 	content_check_function = function (content)
-			-- 		return content.button_hotspot.is_hover
-			-- 	end,
-			-- },
+			{
+				pass_type = "texture_frame",
+				style_id = "frame",
+				texture_id = "frame",
+			},
+			{
+				pass_type = "texture",
+				style_id = "hover",
+				texture_id = "hover",
+				content_check_function = function (content)
+					return content.button_hotspot.is_hover
+				end,
+			},
 		}
 	}
 
@@ -134,16 +134,16 @@ return function()
 			horizontal_alignment = "center",
 			offset = {0, 0, 1},
 		},
-		-- frame = {
-		-- 	texture_size = frame_settings.texture_size,
-		-- 	texture_sizes = frame_settings.texture_sizes,
-		-- 	color = {255, 255, 255, 255},
-		-- 	offset = {0, 0, 2}
-		-- },
-		-- hover = {
-		-- 	color = {255, 255, 255, 255},
-		-- 	offset = {0, 0, 1},
-		-- },
+		frame = {
+			texture_size = frame_settings.texture_size,
+			texture_sizes = frame_settings.texture_sizes,
+			color = {255, 255, 255, 255},
+			offset = {0, 0, 2}
+		},
+		hover = {
+			color = {255, 255, 255, 255},
+			offset = {0, 0, 1},
+		},
 	}
 	
 	-- Create the ten loadout widgets used in the Hero View
@@ -160,8 +160,8 @@ return function()
 		widget.content = {
 			button_hotspot = {},
 			text = tostring(i),
-			-- hover = "button_state_default_2",
-			-- frame = frame_settings.texture,
+			hover = "button_state_default_2",
+			frame = frame_settings.texture,
 		}
 
 		widget.style = style
