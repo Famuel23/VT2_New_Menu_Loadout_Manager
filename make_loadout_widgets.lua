@@ -1,11 +1,12 @@
 --[[
-	Creates a set of Fatshark style widgets to display the 10 loadouts that can be selected.
+	Creates a set of widgets (representing the 10 loadout buttons) and their corresponding scenegraph information.
 
 	Returns:
 	 - An object containing an initialized UI scenegraph ("scenegraph"),
 	 - A collection of widgets representing the loadout buttons ("widgets")
 ]]
 return function()
+
 	local scenegraph_definition = {
 		root = {
 			is_root = true,
@@ -86,50 +87,65 @@ return function()
 	}
 
 	-- Define the widget element passes and style used by each loadout button	
-	element = {
+	local frame_settings = UIFrameSettings.menu_frame_12
+
+	local element = {
 		passes = {
 			{
 				pass_type = "hotspot",
-				content_id = "button_hotspot"
+				content_id = "button_hotspot",
+				style_id = "button",
 			},
 			{
 				pass_type = "rect",
-				style_id = "rect"
+				style_id = "button",
 			},
 			{
 				pass_type = "text",
 				text_id = "text",
-				style_id = "text"
-			}--,
+				style_id = "text",
+			},
 			-- {
 			-- 	pass_type = "texture_frame",
+			-- 	style_id = "frame",
 			-- 	texture_id = "frame",
-			-- 	style_id = "frame"
-			-- }
+			-- },
+			-- {
+			-- 	pass_type = "texture",
+			-- 	style_id = "hover",
+			-- 	content_id = "hover",
+			-- 	content_check_function = function (content)
+			-- 		return content.button_hotspot.is_hover
+			-- 	end,
+			-- },
 		}
 	}
 
-	style = {
-		rect = {
+	local style = {
+		button = {
 			color = Colors.get_color_table_with_alpha("black", 200),
-			offset = {0, 0, 0}
+			offset = {0, 0, 0},
 		},
 		text = {
-			text_color = { 255, 255, 255, 255 },
+			text_color = {255, 255, 255, 255},
 			font_type = "hell_shark",
 			font_size = 18,
 			vertical_alignment = "center",
 			horizontal_alignment = "center",
-			offset = {0, 0, 1}
-		}--,
+			offset = {0, 0, 1},
+		},
 		-- frame = {
-		-- 	texture_size = UIFrameSettings.menu_frame_12.texture.texture_size,
-		-- 	texture_sizes = UIFrameSettings.menu_frame_12.texture.texture_sizes,
+		-- 	texture_size = frame_settings.texture_size,
+		-- 	texture_sizes = frame_settings.texture_sizes,
 		-- 	color = {255, 255, 255, 255},
 		-- 	offset = {0, 0, 2}
-		-- }
+		-- },
+		-- hover = {
+		-- 	color = {255, 255, 255, 255},
+		-- 	offset = {0, 0, 1},
+		-- },
 	}
-
+	
 	-- Create the ten loadout widgets used in the Hero View
 	local widgets = {}
 	local loadout_widgets = {}
@@ -143,9 +159,10 @@ return function()
 
 		widget.content = {
 			button_hotspot = {},
-			text = tostring(i)--,
-			--frame = UIFrameSettings.menu_frame_12.texture
-		}	
+			text = tostring(i),
+			-- hover = "button_state_default_2",
+			-- frame = frame_settings.texture,
+		}
 
 		widget.style = style
 		widget.scenegraph_id = widget_name
