@@ -24,6 +24,10 @@ mod.is_loading = false
 mod.equipment_queue = {}
 mod.careerDecodes = {}
 
+-- Variables initialised for performance
+local InventorySettings = InventorySettings
+local SPProfiles = SPProfiles
+
 --#########################--
 --------- FUNCTIONS ---------
 --#########################--
