@@ -8,4 +8,5 @@ A mod for Vermintide 2 which adds a loadout manager to the new (console) style o
 This allows users to save and load chosen loadouts (gear/talents/cosmetics) for each career via, the addition of new buttons on the relevant menus.
 
 Changelog:
-1.0.0 - WORK IN PROGRESS. Mod is functional (Bot Overrides & Popup selection to be added before release)
+1.0.1 - 10/06/2024 - Mod is no longer required as it has been implemented by developers to the base game.
+1.0.0 - 08/05/2024 - Mod is functional
